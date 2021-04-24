@@ -1,13 +1,11 @@
 #Import Flask and Dependencies
-import numpy as np
-import datetime as dt
-
 import sqlalchemy
 from sqlalchemy.ext.automap import automap_base
 from sqlalchemy.orm import Session
 from sqlalchemy import create_engine, func, inspect
-
 from flask import Flask, jsonify
+
+import datetime as dt
 
 # 1. Database Setup
 engine = create_engine("sqlite:///Resources/hawaii.sqlite")
@@ -28,18 +26,14 @@ app = Flask(__name__)
 # 3. Flask Routes- Define what to do when a user hits the index route
 #Home Page & List all routes that are available.
 @app.route("/")
-def welcome():
-    """List all available api routes."""
-    return (
-        f"Available Routes:<br/>"
-        f"/api/v1.0/precipitation<br/>"
-        f"/api/v1.0/stations<br/>"
-        f"/api/v1.0/tobs<br/>"
-        f"/api/v1.0/<start><br/>"
-        f"/api/v1.0/<start>/<end><br/>"
-    )
+def home():
+    session = Session(engine)
+    print("Server received request for 'Home' page...")
+    return "Available Routes: /api/v1.0/precipitation, /api/v1.0/stations, /api/v1.0/tobs, /api/v1.0/start, /api/v1.0/start/end" 
+    session.close()
+    
 
-#Convert the query results to a dictionary using date as the key and prcp as the value & 
+#Return a JSON list of precipitation from the dataset.
 @app.route("/api/v1.0/precipitation")
 def precipitation():
     
@@ -101,37 +95,34 @@ def tobs():
 
 # When given the start only, calculate TMIN, TAVG, and TMAX for all dates greater than and equal to the start date.
 app.route("/api/v1.0/<start>")
-def start(start=None):
+def start(start):
     
     # Create our session (link) from Python to the DB
     session = Session(engine)
     
     # Query TMIN, TAVG, and TMAX for start
-    from_start = session.query(measurement.date, func.min(measurement.tobs), func.avg(measurement.tobs), 
-                               func.max(measurement.tobs)).filter(measurement.date >= start).group_by(measurement.date).all()
+    start_min = session.query(func.min(Measurement.tobs)).filter(Measurement.date >= start).all()
+    start_max = session.query(func.max(Measurement.tobs)).filter(Measurement.date >= start).all()
+    start_avg = session.query(func.avg(Measurement.tobs)).filter(Measurement.date >= start).all()) 
     session.close()
-    
-    # Convert list of tuples into normal list
-    from_start_list=list(from_start)
-    
-    return jsonify(from_start_list)
+
+    return f'The minimum temperature from {start} to present was {start_min[0][0]}. The maximum temperature was {start_max[0][0]}. The average temperature was {start_avg[0][0]}'
+
 
 # When given the start AND end date, calculate the TMIN, TAVG, and TMAX.
 @app.route("/api/v1.0/<start>/<end>")
-def start_end(start=None, end=None):
+def start_end(start, end):
     
     # Create our session (link) from Python to the DB
     session = Session(engine)
     
     # Query TMIN, TAVG, and TMAX for start & end
-    between_dates = session.query(measurement.date, func.min(measurement.tobs), func.avg(measurement.tobs),
-                    func.max(measurement.tobs)).filter(measurement.date >= start).filter(measurement.date <= end).group_by(measurement.date).all()
+    start_end_min = session.query(func.min(Measurement.tobs)).filter(Measurement.date >= start).filter(Measurement.date < end).all()
+    start_end_max = session.query(func.max(Measurement.tobs)).filter(Measurement.date >= start).filter(Measurement.date < end).all()
+    start_end_avg = session.query(func.avg(Measurement.tobs)).filter(Measurement.date >= start).filter(Measurement.date < end).all()
     session.close()
     
-    # Convert list of tuples into normal list   
-    between_dates_list=list(between_dates)
-    
-    return jsonify(between_dates_list)
+    return f'The minimum temperature from {start} to {end} was {start_end_min[0][0]}. The maximum temperature was {start_end_max[0][0]}. The average temperature was {start_end_avg[0][0]}'
 
 if __name__ == "__main__":
-    app.run(debug=True, use_reloader=False)
+    app.run(debug=True)
